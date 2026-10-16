@@ -7,7 +7,7 @@ Web aplikacija za evidenciju dolazaka i odlazaka djelatnika.
 
 ### Djelatnik
 - Prijava mailom i lozinkom; lozinku može promijeniti sam.
-- Gumbi **Došao sam** / **Odlazim**; vrijeme se može upisati ili ispraviti **samo za današnji dan** (provjera na serveru, zona Europe/Zagreb).
+- Gumbi **Došao sam** / **Odlazim**, više dolazaka u danu je dopušteno, pauza se ne odbija; vrijeme se može upisati ili ispraviti **samo za današnji dan** (provjera na serveru, zona Europe/Zagreb).
 - Aplikacija sama računa odrađene sate.
 - Pregled vlastitih sati, godišnjeg, bolovanja i Jurinih napomena.
 
@@ -22,7 +22,7 @@ Web aplikacija za evidenciju dolazaka i odlazaka djelatnika.
 - QR kod za ispis koji vodi na aplikaciju.
 
 ### Otvorena pitanja
-- Pauze: jedan dolazak/odlazak dnevno ili više? Odbija li se pauza?
+- (nema)
 
 ## Pokretanje na novom računalu
 
