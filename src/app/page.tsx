@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppHeader } from "@/components/app-header";
 import { PeriodTable } from "@/components/period-table";
-import { getCurrentUser } from "@/lib/auth";
+import { requireEmployee } from "@/lib/auth";
 import { loadPeriod } from "@/lib/data";
 import { ABSENCE_LABEL, entryHours, formatHours } from "@/lib/hours";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
@@ -21,7 +21,7 @@ function shiftMonth(month: string, delta: number) {
 }
 
 export default async function HomePage({ searchParams }: PageProps<"/">) {
-  const user = await getCurrentUser();
+  const user = await requireEmployee();
   const now = new Date();
   const today = zagrebDate(now);
   const currentMonth = today.slice(0, 7);

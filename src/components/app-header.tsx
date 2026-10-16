@@ -8,14 +8,10 @@ export function AppHeader({ user }: { user: Profile }) {
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
         <Link href={user.role === "admin" ? "/admin" : "/"} className="font-semibold">
           Evidencija rada
+          {user.role === "admin" && <span className="ml-2 text-xs font-normal text-neutral-500">Admin</span>}
         </Link>
         <nav className="ml-auto flex flex-wrap items-center gap-3 text-sm">
-          {user.role === "admin" && (
-            <>
-              <Link href="/admin" className="hover:underline">Admin</Link>
-              <Link href="/" className="hover:underline">Moj dan</Link>
-            </>
-          )}
+          <span className="text-neutral-500">{user.first_name} {user.last_name}</span>
           <Link href="/lozinka" className="hover:underline">Lozinka</Link>
           <form action={logout}>
             <button type="submit" className="text-neutral-500 hover:text-foreground">Odjava</button>

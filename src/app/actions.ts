@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCurrentUser } from "@/lib/auth";
+import { requireEmployee } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { isValidTime, zagrebDate, zagrebToDate } from "@/lib/time";
 import type { TimeEntry } from "@/lib/hours";
@@ -33,7 +33,7 @@ function overlaps(start: Date, end: Date | null, others: TimeEntry[], now: Date)
 }
 
 export async function clockIn(): Promise<FormState> {
-  const user = await getCurrentUser();
+  const user = await requireEmployee();
   const now = new Date();
   const today = zagrebDate(now);
   const entries = await todayEntries(user.id, today);
@@ -49,7 +49,7 @@ export async function clockIn(): Promise<FormState> {
 }
 
 export async function clockOut(): Promise<FormState> {
-  const user = await getCurrentUser();
+  const user = await requireEmployee();
   const now = new Date();
   const today = zagrebDate(now);
   const open = (await todayEntries(user.id, today)).find((e) => !e.end_at);
@@ -67,7 +67,7 @@ export async function clockOut(): Promise<FormState> {
 
 /** Ručni upis ili ispravak vremena — samo za danas. */
 export async function saveEntry(_prev: FormState, formData: FormData): Promise<FormState> {
-  const user = await getCurrentUser();
+  const user = await requireEmployee();
   const now = new Date();
   const today = zagrebDate(now);
 
@@ -106,7 +106,7 @@ export async function saveEntry(_prev: FormState, formData: FormData): Promise<F
 }
 
 export async function deleteEntry(formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await requireEmployee();
   const today = zagrebDate();
   const id = Number(formData.get("id"));
   const entry = (await todayEntries(user.id, today)).find((e) => e.id === id);

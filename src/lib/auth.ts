@@ -31,6 +31,13 @@ export const getCurrentUser = cache(async (): Promise<Profile> => {
   return profile;
 });
 
+/** Sučelje za djelatnike — admin (Jura) ne upisuje sate, ide na admin sučelje. */
+export async function requireEmployee(): Promise<Profile> {
+  const user = await getCurrentUser();
+  if (user.role === "admin") redirect("/admin");
+  return user;
+}
+
 export async function requireAdmin(): Promise<Profile> {
   const user = await getCurrentUser();
   if (user.role !== "admin") redirect("/");
