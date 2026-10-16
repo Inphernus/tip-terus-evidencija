@@ -11,6 +11,12 @@ export function AppHeader({ user }: { user: Profile }) {
           {user.role === "admin" && <span className="ml-2 text-xs font-normal text-neutral-500">Admin</span>}
         </Link>
         <nav className="ml-auto flex flex-wrap items-center gap-3 text-sm">
+          {user.role === "admin" && (
+            <>
+              <Link href="/admin" className="hover:underline">Djelatnici</Link>
+              <Link href="/admin/statistika" className="hover:underline">Statistika</Link>
+            </>
+          )}
           <span className="text-neutral-500">{user.first_name} {user.last_name}</span>
           <Link href="/lozinka" className="hover:underline">Lozinka</Link>
           <form action={logout}>

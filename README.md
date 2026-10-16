@@ -19,7 +19,7 @@ Web aplikacija za evidenciju dolazaka i odlazaka djelatnika.
 - Upozorenje za dane koje djelatnik nije zatvorio (nema odlaska) – Jura ih zatvara.
 - Statistika: filter po djelatniku i razdoblju.
 - Export šihterice (Excel) po djelatniku ili zbirno, s vikendima i blagdanima.
-- QR kod za ispis koji vodi na aplikaciju.
+- (QR kod radi Dario sam.)
 
 ### Otvorena pitanja
 - (nema)
