@@ -37,3 +37,8 @@ npm run dev
 ```
 
 Aplikacija se otvara na http://localhost:3000.
+
+## Postavljanje baze (jednom)
+
+1. Supabase → **SQL Editor** → zalijepiti sadržaj [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
+2. Kreirati admin račun (Jura): `npm run create-admin` i upisati ime, prezime, mail i lozinku.
