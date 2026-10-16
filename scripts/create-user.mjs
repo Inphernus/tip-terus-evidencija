@@ -1,7 +1,10 @@
-// Kreira admin račun (Jura). Pokretanje: npm run create-admin
+// Kreira račun. Pokretanje: npm run create-admin (Jura) ili npm run create-employee (djelatnik)
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { createClient } from "@supabase/supabase-js";
+
+const role = process.argv[2] === "admin" ? "admin" : "employee";
+const label = role === "admin" ? "Admin" : "Djelatnik";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -38,11 +41,11 @@ if (error) {
 
 const { error: profileError } = await supabase
   .from("profiles")
-  .insert({ id: data.user.id, first_name, last_name, email, role: "admin" });
+  .insert({ id: data.user.id, first_name, last_name, email, role });
 if (profileError) {
   await supabase.auth.admin.deleteUser(data.user.id);
   console.error("✗ Profil nije kreiran (je li pokrenut supabase/schema.sql?):", profileError.message);
   process.exit(1);
 }
 
-console.log(`✓ Admin ${first_name} ${last_name} (${email}) je kreiran.`);
+console.log(`✓ ${label} ${first_name} ${last_name} (${email}) je kreiran.`);
