@@ -1,9 +1,10 @@
+import Link from "next/link";
 import type { PeriodSummary } from "@/lib/data";
 import { ABSENCE_LABEL, formatHours } from "@/lib/hours";
 import { formatDate, weekdayShort, zagrebTime } from "@/lib/time";
 
 /** Tablica po danima (šihterica na ekranu). Najnoviji dan je na vrhu. */
-export function PeriodTable({ summary }: { summary: PeriodSummary }) {
+export function PeriodTable({ summary, editHref }: { summary: PeriodSummary; editHref?: (date: string) => string }) {
   const days = [...summary.days].reverse();
 
   return (
@@ -24,7 +25,13 @@ export function PeriodTable({ summary }: { summary: PeriodSummary }) {
               <tr key={day.date} className={`border-b border-border align-top ${offDay ? "bg-neutral-50 text-neutral-500" : ""}`}>
                 <td className="whitespace-nowrap py-2 pr-3">
                   <span className="inline-block w-8 text-neutral-500">{weekdayShort(day.date)}</span>
-                  {formatDate(day.date)}
+                  {editHref ? (
+                    <Link href={editHref(day.date)} className="text-accent hover:underline">
+                      {formatDate(day.date)}
+                    </Link>
+                  ) : (
+                    formatDate(day.date)
+                  )}
                 </td>
                 <td className="py-2 pr-3">
                   {day.absence && (

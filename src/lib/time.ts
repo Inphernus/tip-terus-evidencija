@@ -65,7 +65,36 @@ export function formatDate(date: string): string {
   return `${Number(d)}.${Number(m)}.${y}.`;
 }
 
+/** "2026-10" iz query parametra; ne dopušta budući mjesec. */
+export function parseMonth(value: unknown, currentMonth: string): string {
+  return typeof value === "string" && /^\d{4}-\d{2}$/.test(value) && value <= currentMonth ? value : currentMonth;
+}
+
+export function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1 + delta, 1)).toISOString().slice(0, 7);
+}
+
+/** Prvi i zadnji dan mjeseca; tekući mjesec završava s danas. */
+export function monthRange(month: string, today: string): [string, string] {
+  const [y, m] = month.split("-").map(Number);
+  const last = `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
+  return [`${month}-01`, last < today ? last : today];
+}
+
+export function monthLabel(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return `${MONTHS[m - 1]} ${y}.`;
+}
+
 export const MONTHS = [
   "siječanj", "veljača", "ožujak", "travanj", "svibanj", "lipanj",
   "srpanj", "kolovoz", "rujan", "listopad", "studeni", "prosinac",
 ];
+
+/** Ispravan kalendarski datum u obliku YYYY-MM-DD (odbija npr. 2026-02-31). */
+export function isValidDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}

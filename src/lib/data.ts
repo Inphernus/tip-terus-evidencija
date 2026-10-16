@@ -3,6 +3,41 @@ import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { ABSENCE_HOURS, entryHours, type Absence, type TimeEntry } from "@/lib/hours";
 import { dateRange, isWeekend } from "@/lib/time";
 
+export type Employee = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  active: boolean;
+};
+
+/** Djelatnici (bez admina), abecedno po prezimenu. */
+export async function loadEmployees({ includeInactive = false } = {}): Promise<Employee[]> {
+  let query = createSupabaseAdmin()
+    .from("profiles")
+    .select("id, first_name, last_name, email, active")
+    .eq("role", "employee")
+    .order("last_name")
+    .order("first_name");
+  if (!includeInactive) query = query.eq("active", true);
+  const { data } = await query;
+  return (data ?? []) as Employee[];
+}
+
+export async function loadEmployee(id: string): Promise<Employee | null> {
+  const { data } = await createSupabaseAdmin()
+    .from("profiles")
+    .select("id, first_name, last_name, email, active")
+    .eq("id", id)
+    .eq("role", "employee")
+    .maybeSingle();
+  return data as Employee | null;
+}
+
+export function fullName(e: Pick<Employee, "first_name" | "last_name">) {
+  return `${e.first_name} ${e.last_name}`;
+}
+
 export type DaySummary = {
   date: string;
   weekend: boolean;

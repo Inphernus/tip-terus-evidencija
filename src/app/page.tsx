@@ -5,20 +5,9 @@ import { requireEmployee } from "@/lib/auth";
 import { loadPeriod } from "@/lib/data";
 import { ABSENCE_LABEL, entryHours, formatHours } from "@/lib/hours";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { formatDate, MONTHS, zagrebDate, zagrebTime } from "@/lib/time";
+import { formatDate, monthRange, MONTHS, parseMonth, shiftMonth, zagrebDate, zagrebTime } from "@/lib/time";
 import { ClockPanel } from "./clock-panel";
 import { TodayEntries } from "./today-entries";
-
-function lastDayOfMonth(month: string) {
-  const [y, m] = month.split("-").map(Number);
-  return `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
-}
-
-function shiftMonth(month: string, delta: number) {
-  const [y, m] = month.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-  return d.toISOString().slice(0, 7);
-}
 
 export default async function HomePage({ searchParams }: PageProps<"/">) {
   const user = await requireEmployee();
@@ -26,9 +15,8 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   const today = zagrebDate(now);
   const currentMonth = today.slice(0, 7);
 
-  const { mjesec } = await searchParams;
-  const month = typeof mjesec === "string" && /^\d{4}-\d{2}$/.test(mjesec) && mjesec <= currentMonth ? mjesec : currentMonth;
-  const monthEnd = month === currentMonth ? today : lastDayOfMonth(month);
+  const month = parseMonth((await searchParams).mjesec, currentMonth);
+  const [, monthEnd] = monthRange(month, today);
 
   const [summary, unclosedRes] = await Promise.all([
     loadPeriod(user.id, `${month}-01`, monthEnd, now),
@@ -81,7 +69,6 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
             end: e.end_at ? zagrebTime(e.end_at) : null,
             hours: formatHours(entryHours(e, now)),
             note: e.note,
-            lockedByAdmin: Boolean(e.edited_by),
           }))}
         />
 
