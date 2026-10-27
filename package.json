@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "create-admin": "node --env-file=.env.local scripts/create-user.mjs admin",
-    "create-employee": "node --env-file=.env.local scripts/create-user.mjs employee"
+    "create-employee": "node --env-file=.env.local scripts/create-user.mjs employee",
+    "set-password": "node --env-file=.env.local scripts/set-password.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

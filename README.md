@@ -43,3 +43,5 @@ Aplikacija se otvara na http://localhost:3000.
 1. Supabase → **SQL Editor** → zalijepiti sadržaj [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
 2. Kreirati admin račun (Jura): `npm run create-admin` i upisati ime, prezime, mail i lozinku.
 3. (Po želji) probni djelatnik: `npm run create-employee`.
+
+Zaboravljena lozinka (i Jurina): `npm run set-password`.
