@@ -1,7 +1,7 @@
 # Tip-Terus · Evidencija radnog vremena
 
 Web aplikacija za evidenciju dolazaka i odlazaka djelatnika.
-Živi na subdomeni `tip-terus.hr`, a na glavnom webu se nalazi gumb koji vodi na nju.
+Živi na **https://satnica.tip-terus.hr** (Netlify, automatski deploy s grane `main`), a na glavnom webu se nalazi gumb koji vodi na nju.
 
 ## Funkcionalnosti
 
@@ -49,3 +49,10 @@ Aplikacija se otvara na http://localhost:3000.
 3. (Po želji) probni djelatnik: `npm run create-employee`.
 
 Zaboravljena lozinka (i Jurina): `npm run set-password`.
+
+## Produkcija
+
+- Hosting: **Netlify** (projekt `dashing-crumble-2f215d`). Svaki push na `main` se sam objavi.
+- Ključevi (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`) su u Netlify → Project configuration → Environment variables.
+- DNS za `tip-terus.hr` je na **Cloudflareu**: `satnica` je CNAME na `dashing-crumble-2f215d.netlify.app`, **DNS only** (sivi oblačić). HTTPS certifikat izdaje Netlify (Let's Encrypt).
+- Netlify Visitor access: produkcija javna, Deploy Previews privatni.
