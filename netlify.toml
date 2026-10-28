@@ -1,0 +1,8 @@
+# Netlify sam prepoznaje Next.js (OpenNext adapter). Ključevi se upisuju u
+# Netlify → Site configuration → Environment variables, ne ovdje.
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
