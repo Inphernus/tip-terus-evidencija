@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/app-header";
 import { PeriodTable } from "@/components/period-table";
 import { requireAdmin } from "@/lib/auth";
 import { fullName, loadEmployees } from "@/lib/data";
-import { ABSENCE_LABEL, ABSENCE_TYPES, formatHours, WEEKLY_LIMIT, type AbsenceType } from "@/lib/hours";
+import { ABSENCE_LABEL, ABSENCE_TYPES, DAILY_LIMIT, formatHours, WEEKLY_LIMIT, type AbsenceType } from "@/lib/hours";
 import { loadReport, parseReportParams } from "@/lib/report";
 import { formatDate } from "@/lib/time";
 
@@ -72,7 +72,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
             </div>
 
             <section className="card overflow-x-auto p-0">
-              <table className="w-full min-w-[640px] text-sm">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-neutral-500">
                     <th className="px-5 py-3 font-medium">Djelatnik</th>
@@ -81,6 +81,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
                       <th key={t} className="px-3 py-3 text-right font-medium">{ABSENCE_LABEL[t]} (dana)</th>
                     ))}
                     <th className="px-3 py-3 text-right font-medium">Ukupno (h)</th>
+                    <th className="px-3 py-3 text-right font-medium">Dana &gt; {DAILY_LIMIT} h</th>
                     <th className="px-5 py-3 text-right font-medium">Tjedana &gt; {WEEKLY_LIMIT} h</th>
                   </tr>
                 </thead>
@@ -101,6 +102,13 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
                         <td key={t} className="px-3 py-3 text-right font-mono tabular-nums">{summary.absenceDays[t] || ""}</td>
                       ))}
                       <td className="px-3 py-3 text-right font-mono font-semibold tabular-nums">{formatHours(summary.totalHours)}</td>
+                      <td className="px-3 py-3 text-right">
+                        {summary.overLimitDays > 0 && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
+                            ⚠ {summary.overLimitDays}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-5 py-3 text-right">
                         {weeks.some((w) => w.overLimit) && (
                           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
@@ -120,6 +128,7 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
                         <td key={t} className="px-3 py-3 text-right font-mono tabular-nums">{totals.days[t] || ""}</td>
                       ))}
                       <td className="px-3 py-3 text-right font-mono tabular-nums">{formatHours(totals.total)}</td>
+                      <td />
                       <td />
                     </tr>
                   </tfoot>

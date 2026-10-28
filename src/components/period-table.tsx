@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import type { PeriodSummary, WeekSummary } from "@/lib/data";
-import { ABSENCE_BADGE, ABSENCE_LABEL, ABSENCE_TYPES, formatHours, WEEKLY_LIMIT } from "@/lib/hours";
+import { ABSENCE_BADGE, ABSENCE_LABEL, ABSENCE_TYPES, DAILY_LIMIT, formatHours, WEEKLY_LIMIT } from "@/lib/hours";
 import { formatDate, mondayOf, weekdayShort, zagrebTime } from "@/lib/time";
 
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
   editHref?: (date: string) => string;
   /** Tjedni zbrojevi (cijeli tjedni); prikazuju se kao redak iznad svakog tjedna. */
   weeks?: WeekSummary[];
-  /** Istakni tjedne preko limita (samo admin). */
+  /** Istakni dane i tjedne preko limita (samo admin). */
   flagOverLimit?: boolean;
 };
 
@@ -50,7 +50,11 @@ export function PeriodTable({ summary, editHref, weeks, flagOverLimit = false }:
                   <td />
                 </tr>
               )}
-              <tr className={`border-b border-border align-top ${offDay ? "bg-neutral-50 text-neutral-500" : ""}`}>
+              <tr
+                className={`border-b border-border align-top ${
+                  flagOverLimit && day.overLimit ? "bg-amber-50" : offDay ? "bg-neutral-50 text-neutral-500" : ""
+                }`}
+              >
                 <td className="whitespace-nowrap py-2 pr-3">
                   <span className="inline-block w-8 text-neutral-500">{weekdayShort(day.date)}</span>
                   {editHref ? (
@@ -74,6 +78,11 @@ export function PeriodTable({ summary, editHref, weeks, flagOverLimit = false }:
                       .join(", ")}
                   </span>
                   {day.unclosed && <span className="ml-2 text-xs font-medium text-red-600">nije zatvoren</span>}
+                  {flagOverLimit && day.overLimit && (
+                    <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-xs font-semibold text-amber-950">
+                      ⚠ više od {DAILY_LIMIT} h
+                    </span>
+                  )}
                 </td>
                 <td className="py-2 pr-3 text-right font-mono tabular-nums">
                   {day.totalHours > 0 ? formatHours(day.totalHours) : ""}

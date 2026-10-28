@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { dateRange, isSunday, isValidDate, isValidTime, zagrebDate, zagrebToDate } from "@/lib/time";
+import { dateRange, formatDate, isSunday, isValidDate, isValidTime, zagrebDate, zagrebToDate } from "@/lib/time";
 import { ABSENCE_LABEL, isAbsenceType, type Absence, type TimeEntry } from "@/lib/hours";
 import type { FormState } from "@/app/prijava/actions";
 
@@ -185,7 +185,11 @@ export async function setAbsence(_prev: FormState, formData: FormData): Promise<
   return { success: "Spremljeno." };
 }
 
-/** Godišnji ili bolovanje za raspon dana (preskače nedjelje i blagdane, po izboru i subote). */
+/**
+ * Godišnji / bolovanje / blagdan za raspon dana (ili jedan dan), ili uklanjanje oznaka.
+ * Nedjelje se preskaču (subote po izboru); kod godišnjeg i bolovanja i blagdani.
+ * Dan može imati samo jednu oznaku: ako neki dan već ima drugu, ništa se ne sprema.
+ */
 export async function setAbsenceRange(_prev: FormState, formData: FormData): Promise<FormState> {
   const admin = await requireAdmin();
   const userId = String(formData.get("user_id"));
@@ -196,26 +200,46 @@ export async function setAbsenceRange(_prev: FormState, formData: FormData): Pro
   const saturdays = formData.get("saturdays") === "on";
 
   if (!isValidDate(from) || !isValidDate(to) || to < from) return { error: "Odaberi ispravan raspon datuma." };
-  if (type !== "godisnji" && type !== "bolovanje") return { error: "Odaberi godišnji ili bolovanje." };
+  if (type !== "" && !isAbsenceType(type)) return { error: "Odaberi vrstu." };
 
   const days = dateRange(from, to);
   if (days.length > 366) return { error: "Raspon je predug." };
 
   const db = createSupabaseAdmin();
-  const { data: holidays } = await db.from("holidays").select("date").gte("date", from).lte("date", to);
+
+  if (type === "") {
+    const { data, error } = await db.from("absences").delete().eq("user_id", userId).gte("date", from).lte("date", to).select("*");
+    if (error) return { error: "Oznake nisu uklonjene." };
+    if (data?.length) await log(admin.id, userId, "odsutnost uklonjena (raspon)", data, null, note);
+    refresh(userId);
+    return { success: data?.length ? `Uklonjeno oznaka: ${data.length}.` : "U rasponu nema oznaka." };
+  }
+
+  const [{ data: holidays }, { data: existing }] = await Promise.all([
+    db.from("holidays").select("date").gte("date", from).lte("date", to),
+    db.from("absences").select("date, type").eq("user_id", userId).gte("date", from).lte("date", to),
+  ]);
   const holidaySet = new Set((holidays ?? []).map((h) => h.date as string));
   const isSaturday = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDay() === 6;
-  const rows = days
-    .filter((d) => !isSunday(d) && !holidaySet.has(d) && (saturdays || !isSaturday(d)))
-    .map((date) => ({ user_id: userId, date, type, note, created_by: admin.id }));
-  if (rows.length === 0) return { error: "U rasponu nema radnih dana." };
+  const targetDays = days.filter(
+    (d) => !isSunday(d) && (saturdays || !isSaturday(d)) && (type === "blagdan" || !holidaySet.has(d)),
+  );
+  if (targetDays.length === 0) return { error: "U rasponu nema dana za označiti." };
 
+  const targetSet = new Set(targetDays);
+  const conflicts = (existing ?? []).filter((a) => targetSet.has(a.date) && a.type !== type);
+  if (conflicts.length > 0) {
+    const list = conflicts.map((c) => `${formatDate(c.date)} (${ABSENCE_LABEL[c.type as keyof typeof ABSENCE_LABEL]})`).join(", ");
+    return { error: `Dan može imati samo jednu oznaku. Već označeno: ${list}. Prvo ukloni ili promijeni te dane.` };
+  }
+
+  const rows = targetDays.map((date) => ({ user_id: userId, date, type, note, created_by: admin.id }));
   const { error } = await db.from("absences").upsert(rows);
   if (error) return { error: "Oznake nisu spremljene." };
   await log(admin.id, userId, "odsutnost (raspon)", null, { from, to, type, days: rows.length }, note);
 
   refresh(userId);
-  return { success: `Označeno ${rows.length} radnih dana.` };
+  return { success: `${ABSENCE_LABEL[type]}: označeno ${rows.length} ${rows.length % 10 === 1 && rows.length % 100 !== 11 ? "dan" : "dana"}.` };
 }
 
 /**

@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import type { Employee, PeriodSummary, WeekSummary } from "@/lib/data";
-import { ABSENCE_HOURS, ABSENCE_LABEL, ABSENCE_TYPES, WEEKLY_LIMIT } from "@/lib/hours";
+import { ABSENCE_HOURS, ABSENCE_LABEL, ABSENCE_TYPES, DAILY_LIMIT, WEEKLY_LIMIT } from "@/lib/hours";
 import { formatDate, weekdayShort, zagrebTime } from "@/lib/time";
 
 type Row = { employee: Employee; summary: PeriodSummary; weeks: WeekSummary[] };
@@ -77,9 +77,12 @@ function employeeSheet(wb: ExcelJS.Workbook, { employee, summary, weeks }: Row, 
 
   let r = 5;
   for (const day of summary.days) {
-    const warning = weekWarning.get(day.date);
+    const weekNote = weekWarning.get(day.date);
+    const dayNote = day.overLimit ? `⚠ više od ${DAILY_LIMIT} h` : null;
+    const warning = weekNote || dayNote;
     const notes = [
-      warning,
+      dayNote,
+      weekNote,
       day.holiday,
       day.absence ? ABSENCE_LABEL[day.absence] : null,
       day.unclosed ? "NIJE ZATVOREN" : null,
@@ -129,14 +132,16 @@ function summarySheet(wb: ExcelJS.Workbook, rows: Row[], from: string, to: strin
   });
   // Stupci: Djelatnik, Rad, [dana + sati za svaku vrstu odsutnosti], Ukupno
   const cols = 3 + ABSENCE_TYPES.length * 2;
-  const warnCol = cols + 1;
+  const dayWarnCol = cols + 1;
+  const warnCol = cols + 2;
   const isHours = (col: number) => col === 2 || col === cols || (col > 2 && col < cols && (col - 3) % 2 === 1);
-  ws.columns = [{ width: 28 }, { width: 10 }, ...ABSENCE_TYPES.flatMap(() => [{ width: 13 }, { width: 13 }]), { width: 11 }, { width: 13 }];
+  ws.columns = [{ width: 28 }, { width: 10 }, ...ABSENCE_TYPES.flatMap(() => [{ width: 13 }, { width: 13 }]), { width: 11 }, { width: 12 }, { width: 13 }];
   title(ws, "Šihterica – zbirno", from, to, warnCol);
   header(ws, 4, [
     "Djelatnik", "Rad (h)",
     ...ABSENCE_TYPES.flatMap((t) => [`${ABSENCE_LABEL[t]} (dana)`, `${ABSENCE_LABEL[t]} (h)`]),
     "Ukupno (h)",
+    `Dana > ${DAILY_LIMIT} h`,
     `Tjedana > ${WEEKLY_LIMIT} h`,
   ]);
 
@@ -149,12 +154,13 @@ function summarySheet(wb: ExcelJS.Workbook, rows: Row[], from: string, to: strin
       round2(summary.workedHours),
       ...ABSENCE_TYPES.flatMap((t) => [summary.absenceDays[t], summary.absenceDays[t] * ABSENCE_HOURS]),
       round2(summary.totalHours),
+      summary.overLimitDays || null,
       over || null,
     ];
     row.eachCell({ includeEmpty: true }, (cell, col) => {
       cell.border = { bottom: THIN, left: THIN, right: THIN };
       if (isHours(col)) cell.numFmt = HOURS_FMT;
-      if (col === warnCol && over) {
+      if ((col === warnCol && over) || (col === dayWarnCol && summary.overLimitDays)) {
         cell.fill = WARN;
         cell.font = { bold: true };
       }

@@ -1,6 +1,6 @@
 import "server-only";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { ABSENCE_HOURS, ABSENCE_TYPES, WEEKLY_LIMIT, entryHours, type Absence, type AbsenceType, type TimeEntry } from "@/lib/hours";
+import { ABSENCE_HOURS, ABSENCE_TYPES, DAILY_LIMIT, WEEKLY_LIMIT, entryHours, type Absence, type AbsenceType, type TimeEntry } from "@/lib/hours";
 import { addDays, dateRange, isSunday, mondayOf, zagrebDate } from "@/lib/time";
 
 export type Employee = {
@@ -51,6 +51,8 @@ export type DaySummary = {
   notes: string[];
   /** Postoji dolazak bez odlaska. */
   unclosed: boolean;
+  /** Više od DAILY_LIMIT sati (rad + oznaka) — Jura provjerava. */
+  overLimit: boolean;
 };
 
 export type PeriodSummary = {
@@ -59,6 +61,8 @@ export type PeriodSummary = {
   absenceDays: Record<AbsenceType, number>;
   absenceHours: number;
   totalHours: number;
+  /** Broj dana s više od DAILY_LIMIT sati. */
+  overLimitDays: number;
 };
 
 /**
@@ -97,6 +101,7 @@ export async function loadPeriod(userId: string, from: string, to: string, now =
       totalHours: workedHours + absenceHours,
       notes,
       unclosed: dayEntries.some((e) => !e.end_at),
+      overLimit: workedHours + absenceHours > DAILY_LIMIT + 1e-9,
     };
   });
 
@@ -109,6 +114,7 @@ export async function loadPeriod(userId: string, from: string, to: string, now =
     ) as Record<AbsenceType, number>,
     absenceHours: sum((d) => d.absenceHours),
     totalHours: sum((d) => d.totalHours),
+    overLimitDays: days.filter((d) => d.overLimit).length,
   };
 }
 
@@ -121,21 +127,24 @@ export type WeekSummary = {
   overLimit: boolean;
 };
 
+/** Tjedni zbrojevi (pon–ned) od ponedjeljka tjedna `from` do tjedna `to`, iz već učitanih dana. */
+export function groupWeeks(days: DaySummary[], from: string, to: string): WeekSummary[] {
+  const weeks: WeekSummary[] = [];
+  for (let monday = mondayOf(from); monday <= to; monday = addDays(monday, 7)) {
+    const end = addDays(monday, 6);
+    const hours = days.filter((d) => d.date >= monday && d.date <= end).reduce((t, d) => t + d.totalHours, 0);
+    weeks.push({ start: monday, end, hours, overLimit: hours > WEEKLY_LIMIT + 1e-9 });
+  }
+  return weeks;
+}
+
 /**
  * Tjedni zbrojevi (pon–ned) za sve tjedne koji dodiruju [from, to].
  * Tjedni se uvijek računaju cijeli, i kad razdoblje počinje usred tjedna.
  */
 export async function loadWeeks(userId: string, from: string, to: string, now = new Date()): Promise<WeekSummary[]> {
   const today = zagrebDate(now);
-  const start = mondayOf(from);
   const sunday = addDays(mondayOf(to), 6);
-  const { days } = await loadPeriod(userId, start, sunday < today ? sunday : today, now);
-
-  const weeks: WeekSummary[] = [];
-  for (let monday = start; monday <= to; monday = addDays(monday, 7)) {
-    const end = addDays(monday, 6);
-    const hours = days.filter((d) => d.date >= monday && d.date <= end).reduce((t, d) => t + d.totalHours, 0);
-    weeks.push({ start: monday, end, hours, overLimit: hours > WEEKLY_LIMIT + 1e-9 });
-  }
-  return weeks;
+  const { days } = await loadPeriod(userId, mondayOf(from), sunday < today ? sunday : today, now);
+  return groupWeeks(days, from, to);
 }

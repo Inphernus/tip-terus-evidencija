@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { setAbsenceRange, setActive, setPassword } from "@/app/admin/actions";
 import { FormMessage } from "@/components/form-message";
+import { ABSENCE_LABEL, ABSENCE_TYPES } from "@/lib/hours";
 
 export function PasswordResetForm({ userId }: { userId: string }) {
   const [state, action, pending] = useActionState(setPassword, undefined);
@@ -23,12 +24,16 @@ export function AbsenceRangeForm({ userId, today }: { userId: string; today: str
   const [state, action, pending] = useActionState(setAbsenceRange, undefined);
   return (
     <form action={action} className="flex flex-col gap-3">
-      <h2 className="font-semibold">Godišnji / bolovanje</h2>
+      <h2 className="font-semibold">Godišnji / bolovanje / blagdan</h2>
       <input type="hidden" name="user_id" value={userId} />
-      <select name="type" required className="input">
-        <option value="godisnji">Godišnji</option>
-        <option value="bolovanje">Bolovanje</option>
-      </select>
+      <div className="flex flex-col gap-1.5 text-sm">
+        {[...ABSENCE_TYPES.map((t) => [t, `${ABSENCE_LABEL[t]} (8 h)`]), ["", "Ukloni oznaku"]].map(([value, label], i) => (
+          <label key={value} className="flex items-center gap-2">
+            <input type="radio" name="type" value={value} defaultChecked={i === 0} />
+            {label}
+          </label>
+        ))}
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1 text-xs font-medium">
           Od
@@ -44,10 +49,13 @@ export function AbsenceRangeForm({ userId, today }: { userId: string; today: str
         <input type="checkbox" name="saturdays" defaultChecked />
         Uključi subote
       </label>
-      <p className="text-xs text-neutral-500">Svaki radni dan = 8 h. Nedjelje i blagdani se preskaču.</p>
+      <p className="text-xs text-neutral-500">
+        Za jedan dan stavi isti datum u „Od“ i „Do“. Nedjelje se preskaču, a kod godišnjeg i bolovanja i blagdani.
+        Dan može imati samo jednu oznaku.
+      </p>
       <FormMessage state={state} />
       <button type="submit" disabled={pending} className="btn-secondary">
-        {pending ? "Spremam…" : "Označi"}
+        {pending ? "Spremam…" : "Spremi"}
       </button>
     </form>
   );

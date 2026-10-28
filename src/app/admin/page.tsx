@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { AppHeader } from "@/components/app-header";
 import { requireAdmin } from "@/lib/auth";
-import { fullName, loadEmployees, loadPeriod, loadWeeks } from "@/lib/data";
-import { ABSENCE_LABEL, formatHours, sumHours, WEEKLY_LIMIT, type TimeEntry } from "@/lib/hours";
+import { fullName, groupWeeks, loadEmployees, loadPeriod } from "@/lib/data";
+import { ABSENCE_LABEL, DAILY_LIMIT, formatHours, sumHours, WEEKLY_LIMIT, type TimeEntry } from "@/lib/hours";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { addDays, formatDate, mondayOf, monthLabel, monthRange, weekdayShort, zagrebDate, zagrebTime } from "@/lib/time";
 import { HolidayForAllForm } from "./holiday-for-all-form";
@@ -17,11 +17,11 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
 
   const employees = await loadEmployees({ includeInactive: showInactive });
   const year = Number(today.slice(0, 4));
-  // Zadnja 4 tjedna (uključujući tekući) za provjeru tjednog limita.
-  const weeksFrom = addDays(mondayOf(today), -21);
-  const [periods, weeks, unclosedRes, holidaysRes] = await Promise.all([
+  // Zadnja 4 tjedna (uključujući tekući) za provjeru dnevnog i tjednog limita.
+  const checkFrom = addDays(mondayOf(today), -21);
+  const [periods, recent, unclosedRes, holidaysRes] = await Promise.all([
     Promise.all(employees.map((e) => loadPeriod(e.id, from, to, now))),
-    Promise.all(employees.map((e) => loadWeeks(e.id, weeksFrom, today, now))),
+    Promise.all(employees.map((e) => loadPeriod(e.id, checkFrom, today, now))),
     createSupabaseAdmin()
       .from("time_entries")
       .select("id, user_id, work_date, start_at")
@@ -38,9 +38,28 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const defaultHoliday = holidays.filter((h) => h.date <= today).at(-1)?.date ?? holidays[0]?.date ?? today;
 
   const byId = new Map(employees.map((e) => [e.id, e]));
-  const overLimit = employees.flatMap((employee, i) =>
-    weeks[i].filter((w) => w.overLimit).map((week) => ({ employee, week })),
-  );
+  const toCheck = employees.flatMap((employee, i) => [
+    ...groupWeeks(recent[i].days, checkFrom, today)
+      .filter((w) => w.overLimit)
+      .map((w) => ({
+        key: `${employee.id}-w-${w.start}`,
+        employee,
+        href: `/admin/statistika?${new URLSearchParams({ djelatnik: employee.id, od: w.start, do: w.end < today ? w.end : today })}`,
+        label: `tjedan ${formatDate(w.start)} – ${formatDate(w.end)}`,
+        hours: w.hours,
+        limit: WEEKLY_LIMIT,
+      })),
+    ...recent[i].days
+      .filter((d) => d.overLimit)
+      .map((d) => ({
+        key: `${employee.id}-d-${d.date}`,
+        employee,
+        href: `/admin/djelatnici/${employee.id}/${d.date}`,
+        label: `${weekdayShort(d.date)} ${formatDate(d.date)}`,
+        hours: d.totalHours,
+        limit: DAILY_LIMIT,
+      })),
+  ]);
   const unclosed = ((unclosedRes.data ?? []) as Pick<TimeEntry, "id" | "user_id" | "work_date" | "start_at">[]).filter(
     (u) => byId.has(u.user_id),
   );
@@ -72,19 +91,17 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           </section>
         )}
 
-        {overLimit.length > 0 && (
+        {toCheck.length > 0 && (
           <section className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-            <h2 className="mb-2 font-semibold text-amber-900">Više od {WEEKLY_LIMIT} h tjedno ({overLimit.length})</h2>
-            <p className="mb-3 text-sm text-amber-900">Provjeri zašto ovi djelatnici imaju više sati od dopuštenog (zadnja 4 tjedna).</p>
+            <h2 className="mb-2 font-semibold text-amber-900">Za provjeru ({toCheck.length})</h2>
+            <p className="mb-3 text-sm text-amber-900">
+              Više od {DAILY_LIMIT} h dnevno ili {WEEKLY_LIMIT} h tjedno (rad + godišnji/bolovanje/blagdan), zadnja 4 tjedna.
+            </p>
             <ul className="flex flex-col gap-1 text-sm">
-              {overLimit.map(({ employee, week }) => (
-                <li key={`${employee.id}-${week.start}`}>
-                  <Link
-                    href={`/admin/statistika?${new URLSearchParams({ djelatnik: employee.id, od: week.start, do: week.end < today ? week.end : today })}`}
-                    className="text-amber-950 underline"
-                  >
-                    {fullName(employee)} · tjedan {formatDate(week.start)} – {formatDate(week.end)} ·{" "}
-                    <strong>{formatHours(week.hours)} h</strong>
+              {toCheck.map((item) => (
+                <li key={item.key}>
+                  <Link href={item.href} className="text-amber-950 underline">
+                    {fullName(item.employee)} · {item.label} · <strong>{formatHours(item.hours)} h</strong> (max {item.limit} h)
                   </Link>
                 </li>
               ))}
