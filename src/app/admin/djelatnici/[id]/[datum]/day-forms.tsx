@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { deleteEntry, saveEntry, setAbsence } from "@/app/admin/actions";
 import { FormMessage } from "@/components/form-message";
+import { ABSENCE_LABEL, ABSENCE_TYPES } from "@/lib/hours";
 
 type Ctx = { userId: string; date: string };
 
@@ -126,14 +127,10 @@ export function AbsenceForm({ ctx, current, note }: { ctx: Ctx; current: string 
   const [state, action, pending] = useActionState(setAbsence, undefined);
   return (
     <form action={action} className="card flex flex-col gap-3">
-      <h2 className="font-semibold">Godišnji / bolovanje</h2>
+      <h2 className="font-semibold">Godišnji / bolovanje / blagdan</h2>
       <Hidden {...ctx} />
       <div className="flex flex-wrap gap-4 text-sm">
-        {[
-          ["", "Ništa"],
-          ["godisnji", "Godišnji (8 h)"],
-          ["bolovanje", "Bolovanje (8 h)"],
-        ].map(([value, label]) => (
+        {[["", "Ništa"], ...ABSENCE_TYPES.map((t) => [t, `${ABSENCE_LABEL[t]} (8 h)`])].map(([value, label]) => (
           <label key={value} className="flex items-center gap-2">
             <input type="radio" name="type" value={value} defaultChecked={(current ?? "") === value} />
             {label}

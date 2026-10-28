@@ -49,11 +49,6 @@ export function dateRange(from: string, to: string): string[] {
   return out;
 }
 
-export function isWeekend(date: string): boolean {
-  const day = new Date(`${date}T12:00:00Z`).getUTCDay();
-  return day === 0 || day === 6;
-}
-
 const WEEKDAYS = ["ned", "pon", "uto", "sri", "čet", "pet", "sub"];
 export function weekdayShort(date: string): string {
   return WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
@@ -97,4 +92,8 @@ export function isValidDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const d = new Date(`${value}T12:00:00Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
+export function isSunday(date: string): boolean {
+  return new Date(`${date}T12:00:00Z`).getUTCDay() === 0;
 }

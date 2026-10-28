@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/app-header";
 import { PeriodTable } from "@/components/period-table";
 import { requireAdmin } from "@/lib/auth";
 import { fullName, loadEmployees } from "@/lib/data";
-import { formatHours } from "@/lib/hours";
+import { ABSENCE_LABEL, ABSENCE_TYPES, formatHours, type AbsenceType } from "@/lib/hours";
 import { loadReport, parseReportParams } from "@/lib/report";
 import { formatDate } from "@/lib/time";
 
@@ -20,15 +20,13 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
   const query = report
     ? new URLSearchParams({ djelatnik: report.params.userId ?? "svi", od: report.params.from, do: report.params.to }).toString()
     : "";
-  const totals = report?.rows.reduce(
-    (t, r) => ({
-      worked: t.worked + r.summary.workedHours,
-      godisnji: t.godisnji + r.summary.godisnjiDays,
-      bolovanje: t.bolovanje + r.summary.bolovanjeDays,
-      total: t.total + r.summary.totalHours,
-    }),
-    { worked: 0, godisnji: 0, bolovanje: 0, total: 0 },
-  );
+  const totals = report && {
+    worked: report.rows.reduce((t, r) => t + r.summary.workedHours, 0),
+    total: report.rows.reduce((t, r) => t + r.summary.totalHours, 0),
+    days: Object.fromEntries(
+      ABSENCE_TYPES.map((type) => [type, report.rows.reduce((t, r) => t + r.summary.absenceDays[type], 0)]),
+    ) as Record<AbsenceType, number>,
+  };
 
   return (
     <>
@@ -74,13 +72,14 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
             </div>
 
             <section className="card overflow-x-auto p-0">
-              <table className="w-full min-w-[560px] text-sm">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-neutral-500">
                     <th className="px-5 py-3 font-medium">Djelatnik</th>
                     <th className="px-3 py-3 text-right font-medium">Rad (h)</th>
-                    <th className="px-3 py-3 text-right font-medium">Godišnji (dana)</th>
-                    <th className="px-3 py-3 text-right font-medium">Bolovanje (dana)</th>
+                    {ABSENCE_TYPES.map((t) => (
+                      <th key={t} className="px-3 py-3 text-right font-medium">{ABSENCE_LABEL[t]} (dana)</th>
+                    ))}
                     <th className="px-5 py-3 text-right font-medium">Ukupno (h)</th>
                   </tr>
                 </thead>
@@ -97,8 +96,9 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
                         {!employee.active && <span className="ml-2 text-xs text-neutral-500">(neaktivan)</span>}
                       </td>
                       <td className="px-3 py-3 text-right font-mono tabular-nums">{formatHours(summary.workedHours)}</td>
-                      <td className="px-3 py-3 text-right font-mono tabular-nums">{summary.godisnjiDays || ""}</td>
-                      <td className="px-3 py-3 text-right font-mono tabular-nums">{summary.bolovanjeDays || ""}</td>
+                      {ABSENCE_TYPES.map((t) => (
+                        <td key={t} className="px-3 py-3 text-right font-mono tabular-nums">{summary.absenceDays[t] || ""}</td>
+                      ))}
                       <td className="px-5 py-3 text-right font-mono font-semibold tabular-nums">{formatHours(summary.totalHours)}</td>
                     </tr>
                   ))}
@@ -108,8 +108,9 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
                     <tr className="font-semibold">
                       <td className="px-5 py-3">Ukupno</td>
                       <td className="px-3 py-3 text-right font-mono tabular-nums">{formatHours(totals.worked)}</td>
-                      <td className="px-3 py-3 text-right font-mono tabular-nums">{totals.godisnji || ""}</td>
-                      <td className="px-3 py-3 text-right font-mono tabular-nums">{totals.bolovanje || ""}</td>
+                      {ABSENCE_TYPES.map((t) => (
+                        <td key={t} className="px-3 py-3 text-right font-mono tabular-nums">{totals.days[t] || ""}</td>
+                      ))}
                       <td className="px-5 py-3 text-right font-mono tabular-nums">{formatHours(totals.total)}</td>
                     </tr>
                   </tfoot>

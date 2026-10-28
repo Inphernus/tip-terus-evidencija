@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { PeriodSummary } from "@/lib/data";
-import { ABSENCE_LABEL, formatHours } from "@/lib/hours";
+import { ABSENCE_BADGE, ABSENCE_LABEL, ABSENCE_TYPES, formatHours } from "@/lib/hours";
 import { formatDate, weekdayShort, zagrebTime } from "@/lib/time";
 
 /** Tablica po danima (šihterica na ekranu). Najnoviji dan je na vrhu. */
@@ -20,7 +20,7 @@ export function PeriodTable({ summary, editHref }: { summary: PeriodSummary; edi
         </thead>
         <tbody>
           {days.map((day) => {
-            const offDay = day.weekend || day.holiday;
+            const offDay = day.sunday || day.holiday;
             return (
               <tr key={day.date} className={`border-b border-border align-top ${offDay ? "bg-neutral-50 text-neutral-500" : ""}`}>
                 <td className="whitespace-nowrap py-2 pr-3">
@@ -35,7 +35,7 @@ export function PeriodTable({ summary, editHref }: { summary: PeriodSummary; edi
                 </td>
                 <td className="py-2 pr-3">
                   {day.absence && (
-                    <span className={`mr-2 rounded px-1.5 py-0.5 text-xs font-medium ${day.absence === "godisnji" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}`}>
+                    <span className={`mr-2 rounded px-1.5 py-0.5 text-xs font-medium ${ABSENCE_BADGE[day.absence]}`}>
                       {ABSENCE_LABEL[day.absence]}
                     </span>
                   )}
@@ -61,8 +61,9 @@ export function PeriodTable({ summary, editHref }: { summary: PeriodSummary; edi
               Ukupno
               <span className="ml-2 text-xs font-normal text-neutral-500">
                 rad {formatHours(summary.workedHours)}
-                {summary.godisnjiDays > 0 && ` · godišnji ${summary.godisnjiDays} d`}
-                {summary.bolovanjeDays > 0 && ` · bolovanje ${summary.bolovanjeDays} d`}
+                {ABSENCE_TYPES.filter((t) => summary.absenceDays[t] > 0).map(
+                  (t) => ` · ${ABSENCE_LABEL[t].toLowerCase()} ${summary.absenceDays[t]} d`,
+                )}
               </span>
             </td>
             <td className="py-3 pr-3 text-right font-mono tabular-nums">{formatHours(summary.totalHours)}</td>

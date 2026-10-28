@@ -14,13 +14,28 @@ export type TimeEntry = {
 export type Absence = {
   user_id: string;
   date: string;
-  type: "godisnji" | "bolovanje";
+  type: AbsenceType;
   note: string | null;
 };
 
-export const ABSENCE_LABEL: Record<Absence["type"], string> = {
+export const ABSENCE_TYPES = ["godisnji", "bolovanje", "blagdan"] as const;
+export type AbsenceType = (typeof ABSENCE_TYPES)[number];
+
+export function isAbsenceType(value: string): value is AbsenceType {
+  return (ABSENCE_TYPES as readonly string[]).includes(value);
+}
+
+export const ABSENCE_LABEL: Record<AbsenceType, string> = {
   godisnji: "Godišnji",
   bolovanje: "Bolovanje",
+  blagdan: "Blagdan",
+};
+
+/** Boje oznake u tablicama. */
+export const ABSENCE_BADGE: Record<AbsenceType, string> = {
+  godisnji: "bg-green-100 text-green-800",
+  bolovanje: "bg-orange-100 text-orange-800",
+  blagdan: "bg-sky-100 text-sky-800",
 };
 
 /** Odrađeni sati jednog zapisa; otvoreni zapis se računa do `now`. Pauze se ne odbijaju. */

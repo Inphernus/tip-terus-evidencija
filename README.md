@@ -14,7 +14,8 @@ Web aplikacija za evidenciju dolazaka i odlazaka djelatnika.
 ### Admin (Jura)
 - Popis djelatnika, dodavanje (ime, prezime, mail, privremena lozinka) i uklanjanje (deaktivacija, povijest ostaje).
 - Postavljanje nove lozinke djelatniku.
-- Označavanje **godišnjeg** i **bolovanja** – svaka kategorija se računa kao 8 sati, ali se vodi zasebno.
+- Označavanje **godišnjeg**, **bolovanja** i **plaćenog blagdana** – svaka kategorija se računa kao 8 sati, ali se vodi zasebno. Blagdan se može zavesti pojedinačno ili svim djelatnicima odjednom.
+- Subota je radni dan; neradna je samo nedjelja (i blagdani).
 - Uređivanje dolaska/odlaska za bilo koji dan uz obavezan opis (opis je vidljiv i djelatniku).
 - Upozorenje za dane koje djelatnik nije zatvorio (nema odlaska) – Jura ih zatvara.
 - Statistika: filter po djelatniku i razdoblju.
@@ -41,6 +42,7 @@ Aplikacija se otvara na http://localhost:3000.
 ## Postavljanje baze (jednom)
 
 1. Supabase → **SQL Editor** → zalijepiti sadržaj [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
+   Postojeća baza: redom pokrenuti datoteke iz [`supabase/migrations/`](supabase/migrations/) koje još nisu pokrenute.
 2. Kreirati admin račun (Jura): `npm run create-admin` i upisati ime, prezime, mail i lozinku.
 3. (Po želji) probni djelatnik: `npm run create-employee`.
 

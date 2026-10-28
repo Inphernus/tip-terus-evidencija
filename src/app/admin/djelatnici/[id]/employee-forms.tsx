@@ -40,7 +40,11 @@ export function AbsenceRangeForm({ userId, today }: { userId: string; today: str
         </label>
       </div>
       <input name="note" placeholder="Napomena (nije obavezno)" className="input" />
-      <p className="text-xs text-neutral-500">Svaki radni dan = 8 h. Vikendi i blagdani se preskaču.</p>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="saturdays" defaultChecked />
+        Uključi subote
+      </label>
+      <p className="text-xs text-neutral-500">Svaki radni dan = 8 h. Nedjelje i blagdani se preskaču.</p>
       <FormMessage state={state} />
       <button type="submit" disabled={pending} className="btn-secondary">
         {pending ? "Spremam…" : "Označi"}

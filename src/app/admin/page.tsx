@@ -4,7 +4,8 @@ import { requireAdmin } from "@/lib/auth";
 import { fullName, loadEmployees, loadPeriod } from "@/lib/data";
 import { ABSENCE_LABEL, formatHours, sumHours, type TimeEntry } from "@/lib/hours";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { formatDate, monthLabel, monthRange, zagrebDate, zagrebTime } from "@/lib/time";
+import { formatDate, monthLabel, monthRange, weekdayShort, zagrebDate, zagrebTime } from "@/lib/time";
+import { HolidayForAllForm } from "./holiday-for-all-form";
 
 export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const admin = await requireAdmin();
@@ -15,7 +16,8 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const [from, to] = monthRange(month, today);
 
   const employees = await loadEmployees({ includeInactive: showInactive });
-  const [periods, unclosedRes] = await Promise.all([
+  const year = Number(today.slice(0, 4));
+  const [periods, unclosedRes, holidaysRes] = await Promise.all([
     Promise.all(employees.map((e) => loadPeriod(e.id, from, to, now))),
     createSupabaseAdmin()
       .from("time_entries")
@@ -23,7 +25,14 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       .is("end_at", null)
       .lt("work_date", today)
       .order("work_date"),
+    createSupabaseAdmin().from("holidays").select("date, name").gte("date", `${year - 1}-01-01`).lte("date", `${year + 1}-12-31`).order("date"),
   ]);
+  const holidays = (holidaysRes.data ?? []).map((h: { date: string; name: string }) => ({
+    date: h.date,
+    label: `${formatDate(h.date)} (${weekdayShort(h.date)}) – ${h.name}`,
+  }));
+  // Zadano: zadnji blagdan do danas, inače prvi sljedeći.
+  const defaultHoliday = holidays.filter((h) => h.date <= today).at(-1)?.date ?? holidays[0]?.date ?? today;
 
   const byId = new Map(employees.map((e) => [e.id, e]));
   const unclosed = ((unclosedRes.data ?? []) as Pick<TimeEntry, "id" | "user_id" | "work_date" | "start_at">[]).filter(
@@ -108,6 +117,8 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
             </tbody>
           </table>
         </section>
+
+        {holidays.length > 0 && <HolidayForAllForm holidays={holidays} defaultDate={defaultHoliday} />}
 
         <Link href={showInactive ? "/admin" : "/admin?svi=1"} className="self-start text-sm text-neutral-500 hover:underline">
           {showInactive ? "Sakrij neaktivne djelatnike" : "Prikaži i neaktivne djelatnike"}

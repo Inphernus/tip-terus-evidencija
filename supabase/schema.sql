@@ -1,10 +1,10 @@
 -- Tip-Terus evidencija radnog vremena — shema baze
--- Pokrenuti jednom u Supabase → SQL Editor.
+-- Pokrenuti jednom u Supabase → SQL Editor (nova baza; već postojeća baza: pokrenuti datoteke iz migrations/).
 -- Sve izmjene podataka idu preko servera (secret key); RLS dopušta samo čitanje.
 
 -- ---------- Tipovi ----------
 create type user_role as enum ('admin', 'employee');
-create type absence_type as enum ('godisnji', 'bolovanje');
+create type absence_type as enum ('godisnji', 'bolovanje', 'blagdan');
 
 -- ---------- Djelatnici ----------
 create table profiles (
@@ -32,7 +32,7 @@ create table time_entries (
 );
 create index time_entries_user_date on time_entries (user_id, work_date);
 
--- ---------- Godišnji / bolovanje (8 h, posebna kategorija) ----------
+-- ---------- Godišnji / bolovanje / plaćeni blagdan (8 h, posebne kategorije) ----------
 create table absences (
   user_id     uuid not null references profiles on delete cascade,
   date        date not null,

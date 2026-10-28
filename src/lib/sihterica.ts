@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import type { Employee, PeriodSummary } from "@/lib/data";
-import { ABSENCE_LABEL } from "@/lib/hours";
+import { ABSENCE_HOURS, ABSENCE_LABEL, ABSENCE_TYPES } from "@/lib/hours";
 import { formatDate, weekdayShort, zagrebTime } from "@/lib/time";
 
 type Row = { employee: Employee; summary: PeriodSummary };
@@ -49,11 +49,22 @@ function employeeSheet(wb: ExcelJS.Workbook, { employee, summary }: Row, from: s
     pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
     views: [{ state: "frozen", ySplit: 4 }],
   });
+  // Stupci: Datum, Dan, Dolazak – odlazak, Rad, [po jedan za svaku vrstu odsutnosti], Ukupno, Napomena
+  const absCols = ABSENCE_TYPES.length;
+  const hoursFrom = 4;
+  const hoursTo = 5 + absCols;
+  const noteCol = hoursTo + 1;
   ws.columns = [
-    { width: 12 }, { width: 6 }, { width: 30 }, { width: 9 }, { width: 10 }, { width: 11 }, { width: 10 }, { width: 40 },
+    { width: 12 }, { width: 6 }, { width: 30 }, { width: 9 },
+    ...ABSENCE_TYPES.map(() => ({ width: 11 })),
+    { width: 10 }, { width: 40 },
   ];
-  title(ws, `Šihterica – ${name(employee)}`, from, to, 8);
-  header(ws, 4, ["Datum", "Dan", "Dolazak – odlazak", "Rad (h)", "Godišnji (h)", "Bolovanje (h)", "Ukupno (h)", "Napomena"]);
+  title(ws, `Šihterica – ${name(employee)}`, from, to, noteCol);
+  header(ws, 4, [
+    "Datum", "Dan", "Dolazak – odlazak", "Rad (h)",
+    ...ABSENCE_TYPES.map((t) => `${ABSENCE_LABEL[t]} (h)`),
+    "Ukupno (h)", "Napomena",
+  ]);
 
   let r = 5;
   for (const day of summary.days) {
@@ -69,40 +80,48 @@ function employeeSheet(wb: ExcelJS.Workbook, { employee, summary }: Row, from: s
       weekdayShort(day.date),
       day.entries.map((e) => `${zagrebTime(e.start_at)}–${e.end_at ? zagrebTime(e.end_at) : "?"}`).join(", "),
       day.workedHours ? round2(day.workedHours) : null,
-      day.absence === "godisnji" ? day.absenceHours : null,
-      day.absence === "bolovanje" ? day.absenceHours : null,
+      ...ABSENCE_TYPES.map((t) => (day.absence === t ? day.absenceHours : null)),
       day.totalHours ? round2(day.totalHours) : null,
       notes.join(" · "),
     ];
     row.eachCell({ includeEmpty: true }, (cell, col) => {
       cell.border = { bottom: THIN, left: THIN, right: THIN };
-      if (col >= 4 && col <= 7) cell.numFmt = HOURS_FMT;
-      if (col === 8) cell.alignment = { wrapText: true, vertical: "top" };
-      if (day.weekend || day.holiday) cell.fill = GREY;
+      if (col >= hoursFrom && col <= hoursTo) cell.numFmt = HOURS_FMT;
+      if (col === noteCol) cell.alignment = { wrapText: true, vertical: "top" };
+      if (day.sunday || day.holiday) cell.fill = GREY;
     });
   }
 
-  const godisnjiHours = summary.days.filter((d) => d.absence === "godisnji").reduce((t, d) => t + d.absenceHours, 0);
-  const bolovanjeHours = summary.days.filter((d) => d.absence === "bolovanje").reduce((t, d) => t + d.absenceHours, 0);
   const total = ws.getRow(r);
-  total.values = ["UKUPNO", null, null, round2(summary.workedHours), godisnjiHours, bolovanjeHours, round2(summary.totalHours), null];
+  total.values = [
+    "UKUPNO", null, null, round2(summary.workedHours),
+    ...ABSENCE_TYPES.map((t) => summary.absenceDays[t] * ABSENCE_HOURS),
+    round2(summary.totalHours), null,
+  ];
   total.eachCell({ includeEmpty: true }, (cell, col) => {
     cell.font = { bold: true };
     cell.border = { top: { style: "medium" }, bottom: { style: "medium" } };
-    if (col >= 4 && col <= 7) cell.numFmt = HOURS_FMT;
+    if (col >= hoursFrom && col <= hoursTo) cell.numFmt = HOURS_FMT;
   });
 
-  ws.getRow(r + 2).values = [`Godišnji: ${dana(summary.godisnjiDays)} · Bolovanje: ${dana(summary.bolovanjeDays)}`];
-  ws.getRow(r + 4).values = ["Potpis djelatnika: ____________________", null, null, null, "Potpis odgovorne osobe: ____________________"];
+  ws.getRow(r + 2).values = [ABSENCE_TYPES.map((t) => `${ABSENCE_LABEL[t]}: ${dana(summary.absenceDays[t])}`).join(" · ")];
+  ws.getRow(r + 4).values = ["Potpis djelatnika: ____________________", null, null, null, null, "Potpis odgovorne osobe: ____________________"];
 }
 
 function summarySheet(wb: ExcelJS.Workbook, rows: Row[], from: string, to: string) {
   const ws = wb.addWorksheet("Zbirno", {
     pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
-  ws.columns = [{ width: 28 }, { width: 10 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 11 }];
-  title(ws, "Šihterica – zbirno", from, to, 7);
-  header(ws, 4, ["Djelatnik", "Rad (h)", "Godišnji (dana)", "Godišnji (h)", "Bolovanje (dana)", "Bolovanje (h)", "Ukupno (h)"]);
+  // Stupci: Djelatnik, Rad, [dana + sati za svaku vrstu odsutnosti], Ukupno
+  const cols = 3 + ABSENCE_TYPES.length * 2;
+  const isHours = (col: number) => col === 2 || col === cols || (col > 2 && col < cols && (col - 3) % 2 === 1);
+  ws.columns = [{ width: 28 }, { width: 10 }, ...ABSENCE_TYPES.flatMap(() => [{ width: 13 }, { width: 13 }]), { width: 11 }];
+  title(ws, "Šihterica – zbirno", from, to, cols);
+  header(ws, 4, [
+    "Djelatnik", "Rad (h)",
+    ...ABSENCE_TYPES.flatMap((t) => [`${ABSENCE_LABEL[t]} (dana)`, `${ABSENCE_LABEL[t]} (h)`]),
+    "Ukupno (h)",
+  ]);
 
   let r = 5;
   for (const { employee, summary } of rows) {
@@ -110,24 +129,21 @@ function summarySheet(wb: ExcelJS.Workbook, rows: Row[], from: string, to: strin
     row.values = [
       name(employee) + (employee.active ? "" : " (neaktivan)"),
       round2(summary.workedHours),
-      summary.godisnjiDays,
-      summary.godisnjiDays * 8,
-      summary.bolovanjeDays,
-      summary.bolovanjeDays * 8,
+      ...ABSENCE_TYPES.flatMap((t) => [summary.absenceDays[t], summary.absenceDays[t] * ABSENCE_HOURS]),
       round2(summary.totalHours),
     ];
     row.eachCell({ includeEmpty: true }, (cell, col) => {
       cell.border = { bottom: THIN, left: THIN, right: THIN };
-      if ([2, 4, 6, 7].includes(col)) cell.numFmt = HOURS_FMT;
+      if (isHours(col)) cell.numFmt = HOURS_FMT;
     });
   }
   const total = ws.getRow(r);
-  const sum = (col: string) => ({ formula: `SUM(${col}5:${col}${r - 1})` });
-  total.values = ["UKUPNO", sum("B"), sum("C"), sum("D"), sum("E"), sum("F"), sum("G")];
+  const letter = (col: number) => String.fromCharCode(64 + col);
+  total.values = ["UKUPNO", ...Array.from({ length: cols - 1 }, (_, i) => ({ formula: `SUM(${letter(i + 2)}5:${letter(i + 2)}${r - 1})` }))];
   total.eachCell({ includeEmpty: true }, (cell, col) => {
     cell.font = { bold: true };
     cell.border = { top: { style: "medium" }, bottom: { style: "medium" } };
-    if ([2, 4, 6, 7].includes(col)) cell.numFmt = HOURS_FMT;
+    if (isHours(col)) cell.numFmt = HOURS_FMT;
   });
 }
 

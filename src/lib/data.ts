@@ -1,7 +1,7 @@
 import "server-only";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { ABSENCE_HOURS, entryHours, type Absence, type TimeEntry } from "@/lib/hours";
-import { dateRange, isWeekend } from "@/lib/time";
+import { ABSENCE_HOURS, ABSENCE_TYPES, entryHours, type Absence, type AbsenceType, type TimeEntry } from "@/lib/hours";
+import { dateRange, isSunday } from "@/lib/time";
 
 export type Employee = {
   id: string;
@@ -40,7 +40,8 @@ export function fullName(e: Pick<Employee, "first_name" | "last_name">) {
 
 export type DaySummary = {
   date: string;
-  weekend: boolean;
+  /** Nedjelja — subota je radni dan. */
+  sunday: boolean;
   holiday: string | null;
   absence: Absence["type"] | null;
   entries: TimeEntry[];
@@ -55,8 +56,7 @@ export type DaySummary = {
 export type PeriodSummary = {
   days: DaySummary[];
   workedHours: number;
-  godisnjiDays: number;
-  bolovanjeDays: number;
+  absenceDays: Record<AbsenceType, number>;
   absenceHours: number;
   totalHours: number;
 };
@@ -88,7 +88,7 @@ export async function loadPeriod(userId: string, from: string, to: string, now =
     ];
     return {
       date,
-      weekend: isWeekend(date),
+      sunday: isSunday(date),
       holiday: holidays.get(date) ?? null,
       absence: absence?.type ?? null,
       entries: dayEntries,
@@ -104,8 +104,9 @@ export async function loadPeriod(userId: string, from: string, to: string, now =
   return {
     days,
     workedHours: sum((d) => d.workedHours),
-    godisnjiDays: days.filter((d) => d.absence === "godisnji").length,
-    bolovanjeDays: days.filter((d) => d.absence === "bolovanje").length,
+    absenceDays: Object.fromEntries(
+      ABSENCE_TYPES.map((type) => [type, days.filter((d) => d.absence === type).length]),
+    ) as Record<AbsenceType, number>,
     absenceHours: sum((d) => d.absenceHours),
     totalHours: sum((d) => d.totalHours),
   };

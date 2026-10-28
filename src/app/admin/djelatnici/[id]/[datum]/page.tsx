@@ -52,7 +52,7 @@ export default async function DayPage({ params }: PageProps<"/admin/djelatnici/[
           </div>
           <p className="text-sm text-neutral-500">
             {day.holiday && `${day.holiday} · `}
-            {day.weekend && "Vikend · "}
+            {day.sunday && "Nedjelja · "}
             Ukupno: <strong className="font-mono">{formatHours(day.totalHours)}</strong> h
           </p>
         </div>

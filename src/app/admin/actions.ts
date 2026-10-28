@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { dateRange, isValidDate, isValidTime, isWeekend, zagrebDate, zagrebToDate } from "@/lib/time";
-import type { Absence, TimeEntry } from "@/lib/hours";
+import { dateRange, isSunday, isValidDate, isValidTime, zagrebDate, zagrebToDate } from "@/lib/time";
+import { ABSENCE_LABEL, isAbsenceType, type Absence, type TimeEntry } from "@/lib/hours";
 import type { FormState } from "@/app/prijava/actions";
 
 const BAN_FOREVER = "876000h";
@@ -158,7 +158,7 @@ export async function deleteEntry(_prev: FormState, formData: FormData): Promise
   return { success: "Zapis obrisan." };
 }
 
-/** Godišnji / bolovanje (8 h) ili uklanjanje oznake. Može i za buduće dane (planirani godišnji). */
+/** Godišnji / bolovanje / blagdan (8 h) ili uklanjanje oznake. Može i za buduće dane (planirani godišnji). */
 export async function setAbsence(_prev: FormState, formData: FormData): Promise<FormState> {
   const admin = await requireAdmin();
   const { userId, date, note } = readDay(formData);
@@ -172,7 +172,7 @@ export async function setAbsence(_prev: FormState, formData: FormData): Promise<
     if (!existing) return { success: "Nema oznake." };
     await db.from("absences").delete().eq("user_id", userId).eq("date", date);
     await log(admin.id, userId, "odsutnost uklonjena", existing, null, note || null);
-  } else if (type === "godisnji" || type === "bolovanje") {
+  } else if (isAbsenceType(type)) {
     const row = { user_id: userId, date, type, note: note || null, created_by: admin.id };
     const { error } = await db.from("absences").upsert(row);
     if (error) return { error: "Oznaka nije spremljena." };
@@ -185,7 +185,7 @@ export async function setAbsence(_prev: FormState, formData: FormData): Promise<
   return { success: "Spremljeno." };
 }
 
-/** Godišnji ili bolovanje za raspon dana (preskače vikende i blagdane). */
+/** Godišnji ili bolovanje za raspon dana (preskače nedjelje i blagdane, po izboru i subote). */
 export async function setAbsenceRange(_prev: FormState, formData: FormData): Promise<FormState> {
   const admin = await requireAdmin();
   const userId = String(formData.get("user_id"));
@@ -193,6 +193,7 @@ export async function setAbsenceRange(_prev: FormState, formData: FormData): Pro
   const to = String(formData.get("to") ?? "");
   const type = String(formData.get("type") ?? "");
   const note = String(formData.get("note") ?? "").trim() || null;
+  const saturdays = formData.get("saturdays") === "on";
 
   if (!isValidDate(from) || !isValidDate(to) || to < from) return { error: "Odaberi ispravan raspon datuma." };
   if (type !== "godisnji" && type !== "bolovanje") return { error: "Odaberi godišnji ili bolovanje." };
@@ -203,8 +204,9 @@ export async function setAbsenceRange(_prev: FormState, formData: FormData): Pro
   const db = createSupabaseAdmin();
   const { data: holidays } = await db.from("holidays").select("date").gte("date", from).lte("date", to);
   const holidaySet = new Set((holidays ?? []).map((h) => h.date as string));
+  const isSaturday = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDay() === 6;
   const rows = days
-    .filter((d) => !isWeekend(d) && !holidaySet.has(d))
+    .filter((d) => !isSunday(d) && !holidaySet.has(d) && (saturdays || !isSaturday(d)))
     .map((date) => ({ user_id: userId, date, type, note, created_by: admin.id }));
   if (rows.length === 0) return { error: "U rasponu nema radnih dana." };
 
@@ -214,4 +216,45 @@ export async function setAbsenceRange(_prev: FormState, formData: FormData): Pro
 
   refresh(userId);
   return { success: `Označeno ${rows.length} radnih dana.` };
+}
+
+/**
+ * Plaćeni blagdan (8 h) za sve aktivne djelatnike odjednom.
+ * Djelatnike koji taj dan već imaju godišnji ili bolovanje ne dira.
+ * S `remove` uklanja oznaku blagdana svima za taj dan.
+ */
+export async function setHolidayForAll(_prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireAdmin();
+  const date = String(formData.get("date") ?? "");
+  const note = String(formData.get("note") ?? "").trim() || null;
+  const remove = formData.get("intent") === "remove";
+  if (!isValidDate(date)) return { error: "Odaberi datum." };
+
+  const db = createSupabaseAdmin();
+  if (remove) {
+    const { data, error } = await db.from("absences").delete().eq("date", date).eq("type", "blagdan").select("user_id");
+    if (error) return { error: "Oznake nisu uklonjene." };
+    for (const row of data ?? []) await log(admin.id, row.user_id, "blagdan uklonjen (svi)", { date }, null, note);
+    revalidatePath("/admin", "layout");
+    return { success: `Blagdan uklonjen za ${data?.length ?? 0} djelatnika.` };
+  }
+
+  const { data: employees } = await db.from("profiles").select("id").eq("role", "employee").eq("active", true);
+  const rows = (employees ?? []).map((e) => ({ user_id: e.id, date, type: "blagdan", note, created_by: admin.id }));
+  if (rows.length === 0) return { error: "Nema aktivnih djelatnika." };
+
+  const { data, error } = await db
+    .from("absences")
+    .upsert(rows, { onConflict: "user_id,date", ignoreDuplicates: true })
+    .select("user_id");
+  if (error) return { error: "Oznake nisu spremljene. Je li pokrenuta migracija 002_blagdan.sql?" };
+  for (const row of data ?? []) await log(admin.id, row.user_id, "blagdan (svi)", null, { date, type: "blagdan" }, note);
+
+  revalidatePath("/admin", "layout");
+  const skipped = rows.length - (data?.length ?? 0);
+  return {
+    success:
+      `${ABSENCE_LABEL.blagdan} (8 h) zaveden za ${data?.length ?? 0} djelatnika.` +
+      (skipped ? ` Preskočeno ${skipped} (već imaju oznaku za taj dan).` : ""),
+  };
 }
