@@ -1,7 +1,7 @@
 import "server-only";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { ABSENCE_HOURS, ABSENCE_TYPES, entryHours, type Absence, type AbsenceType, type TimeEntry } from "@/lib/hours";
-import { dateRange, isSunday } from "@/lib/time";
+import { ABSENCE_HOURS, ABSENCE_TYPES, WEEKLY_LIMIT, entryHours, type Absence, type AbsenceType, type TimeEntry } from "@/lib/hours";
+import { addDays, dateRange, isSunday, mondayOf, zagrebDate } from "@/lib/time";
 
 export type Employee = {
   id: string;
@@ -110,4 +110,32 @@ export async function loadPeriod(userId: string, from: string, to: string, now =
     absenceHours: sum((d) => d.absenceHours),
     totalHours: sum((d) => d.totalHours),
   };
+}
+
+export type WeekSummary = {
+  /** Ponedjeljak. */
+  start: string;
+  /** Nedjelja. */
+  end: string;
+  hours: number;
+  overLimit: boolean;
+};
+
+/**
+ * Tjedni zbrojevi (pon–ned) za sve tjedne koji dodiruju [from, to].
+ * Tjedni se uvijek računaju cijeli, i kad razdoblje počinje usred tjedna.
+ */
+export async function loadWeeks(userId: string, from: string, to: string, now = new Date()): Promise<WeekSummary[]> {
+  const today = zagrebDate(now);
+  const start = mondayOf(from);
+  const sunday = addDays(mondayOf(to), 6);
+  const { days } = await loadPeriod(userId, start, sunday < today ? sunday : today, now);
+
+  const weeks: WeekSummary[] = [];
+  for (let monday = start; monday <= to; monday = addDays(monday, 7)) {
+    const end = addDays(monday, 6);
+    const hours = days.filter((d) => d.date >= monday && d.date <= end).reduce((t, d) => t + d.totalHours, 0);
+    weeks.push({ start: monday, end, hours, overLimit: hours > WEEKLY_LIMIT + 1e-9 });
+  }
+  return weeks;
 }

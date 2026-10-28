@@ -3,7 +3,7 @@ import { AppHeader } from "@/components/app-header";
 import { PeriodTable } from "@/components/period-table";
 import { requireAdmin } from "@/lib/auth";
 import { fullName, loadEmployees } from "@/lib/data";
-import { ABSENCE_LABEL, ABSENCE_TYPES, formatHours, type AbsenceType } from "@/lib/hours";
+import { ABSENCE_LABEL, ABSENCE_TYPES, formatHours, WEEKLY_LIMIT, type AbsenceType } from "@/lib/hours";
 import { loadReport, parseReportParams } from "@/lib/report";
 import { formatDate } from "@/lib/time";
 
@@ -80,11 +80,12 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
                     {ABSENCE_TYPES.map((t) => (
                       <th key={t} className="px-3 py-3 text-right font-medium">{ABSENCE_LABEL[t]} (dana)</th>
                     ))}
-                    <th className="px-5 py-3 text-right font-medium">Ukupno (h)</th>
+                    <th className="px-3 py-3 text-right font-medium">Ukupno (h)</th>
+                    <th className="px-5 py-3 text-right font-medium">Tjedana &gt; {WEEKLY_LIMIT} h</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {report.rows.map(({ employee, summary }) => (
+                  {report.rows.map(({ employee, summary, weeks }) => (
                     <tr key={employee.id} className="border-b border-border">
                       <td className="px-5 py-3">
                         <Link
@@ -99,7 +100,14 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
                       {ABSENCE_TYPES.map((t) => (
                         <td key={t} className="px-3 py-3 text-right font-mono tabular-nums">{summary.absenceDays[t] || ""}</td>
                       ))}
-                      <td className="px-5 py-3 text-right font-mono font-semibold tabular-nums">{formatHours(summary.totalHours)}</td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold tabular-nums">{formatHours(summary.totalHours)}</td>
+                      <td className="px-5 py-3 text-right">
+                        {weeks.some((w) => w.overLimit) && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
+                            ⚠ {weeks.filter((w) => w.overLimit).length}
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -111,7 +119,8 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
                       {ABSENCE_TYPES.map((t) => (
                         <td key={t} className="px-3 py-3 text-right font-mono tabular-nums">{totals.days[t] || ""}</td>
                       ))}
-                      <td className="px-5 py-3 text-right font-mono tabular-nums">{formatHours(totals.total)}</td>
+                      <td className="px-3 py-3 text-right font-mono tabular-nums">{formatHours(totals.total)}</td>
+                      <td />
                     </tr>
                   </tfoot>
                 )}
@@ -123,6 +132,8 @@ export default async function StatsPage({ searchParams }: PageProps<"/admin/stat
                 <h2 className="mb-3 font-semibold">Po danima</h2>
                 <PeriodTable
                   summary={report.rows[0].summary}
+                  weeks={report.rows[0].weeks}
+                  flagOverLimit
                   editHref={(date) => `/admin/djelatnici/${report.rows[0].employee.id}/${date}`}
                 />
               </section>

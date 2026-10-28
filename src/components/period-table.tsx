@@ -1,11 +1,26 @@
+import { Fragment } from "react";
 import Link from "next/link";
-import type { PeriodSummary } from "@/lib/data";
-import { ABSENCE_BADGE, ABSENCE_LABEL, ABSENCE_TYPES, formatHours } from "@/lib/hours";
-import { formatDate, weekdayShort, zagrebTime } from "@/lib/time";
+import type { PeriodSummary, WeekSummary } from "@/lib/data";
+import { ABSENCE_BADGE, ABSENCE_LABEL, ABSENCE_TYPES, formatHours, WEEKLY_LIMIT } from "@/lib/hours";
+import { formatDate, mondayOf, weekdayShort, zagrebTime } from "@/lib/time";
+
+type Props = {
+  summary: PeriodSummary;
+  editHref?: (date: string) => string;
+  /** Tjedni zbrojevi (cijeli tjedni); prikazuju se kao redak iznad svakog tjedna. */
+  weeks?: WeekSummary[];
+  /** Istakni tjedne preko limita (samo admin). */
+  flagOverLimit?: boolean;
+};
 
 /** Tablica po danima (šihterica na ekranu). Najnoviji dan je na vrhu. */
-export function PeriodTable({ summary, editHref }: { summary: PeriodSummary; editHref?: (date: string) => string }) {
+export function PeriodTable({ summary, editHref, weeks, flagOverLimit = false }: Props) {
   const days = [...summary.days].reverse();
+  const weekByStart = new Map((weeks ?? []).map((w) => [w.start, w]));
+  // Redak tjedna ide iznad najnovijeg prikazanog dana tog tjedna.
+  const weekHeadDates = new Set(
+    days.filter((d, i) => i === 0 || mondayOf(days[i - 1].date) !== mondayOf(d.date)).map((d) => d.date),
+  );
 
   return (
     <div className="overflow-x-auto">
@@ -21,8 +36,21 @@ export function PeriodTable({ summary, editHref }: { summary: PeriodSummary; edi
         <tbody>
           {days.map((day) => {
             const offDay = day.sunday || day.holiday;
+            const week = weekHeadDates.has(day.date) ? weekByStart.get(mondayOf(day.date)) : undefined;
+            const flagged = flagOverLimit && week?.overLimit;
             return (
-              <tr key={day.date} className={`border-b border-border align-top ${offDay ? "bg-neutral-50 text-neutral-500" : ""}`}>
+              <Fragment key={day.date}>
+              {week && (
+                <tr className={flagged ? "bg-amber-100 text-amber-950" : "bg-neutral-100 text-neutral-600"}>
+                  <td className="py-1.5 pr-3 text-xs font-medium" colSpan={2}>
+                    Tjedan {formatDate(week.start)} – {formatDate(week.end)}
+                    {flagged && <span className="ml-2 font-semibold">⚠ više od {WEEKLY_LIMIT} h – provjeri</span>}
+                  </td>
+                  <td className="py-1.5 pr-3 text-right font-mono text-xs font-semibold tabular-nums">{formatHours(week.hours)}</td>
+                  <td />
+                </tr>
+              )}
+              <tr className={`border-b border-border align-top ${offDay ? "bg-neutral-50 text-neutral-500" : ""}`}>
                 <td className="whitespace-nowrap py-2 pr-3">
                   <span className="inline-block w-8 text-neutral-500">{weekdayShort(day.date)}</span>
                   {editHref ? (
@@ -52,6 +80,7 @@ export function PeriodTable({ summary, editHref }: { summary: PeriodSummary; edi
                 </td>
                 <td className="py-2 text-amber-700">{day.notes.join(" · ")}</td>
               </tr>
+              </Fragment>
             );
           })}
         </tbody>

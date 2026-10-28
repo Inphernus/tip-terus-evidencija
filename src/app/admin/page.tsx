@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { AppHeader } from "@/components/app-header";
 import { requireAdmin } from "@/lib/auth";
-import { fullName, loadEmployees, loadPeriod } from "@/lib/data";
-import { ABSENCE_LABEL, formatHours, sumHours, type TimeEntry } from "@/lib/hours";
+import { fullName, loadEmployees, loadPeriod, loadWeeks } from "@/lib/data";
+import { ABSENCE_LABEL, formatHours, sumHours, WEEKLY_LIMIT, type TimeEntry } from "@/lib/hours";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
-import { formatDate, monthLabel, monthRange, weekdayShort, zagrebDate, zagrebTime } from "@/lib/time";
+import { addDays, formatDate, mondayOf, monthLabel, monthRange, weekdayShort, zagrebDate, zagrebTime } from "@/lib/time";
 import { HolidayForAllForm } from "./holiday-for-all-form";
 
 export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
@@ -17,8 +17,11 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
 
   const employees = await loadEmployees({ includeInactive: showInactive });
   const year = Number(today.slice(0, 4));
-  const [periods, unclosedRes, holidaysRes] = await Promise.all([
+  // Zadnja 4 tjedna (uključujući tekući) za provjeru tjednog limita.
+  const weeksFrom = addDays(mondayOf(today), -21);
+  const [periods, weeks, unclosedRes, holidaysRes] = await Promise.all([
     Promise.all(employees.map((e) => loadPeriod(e.id, from, to, now))),
+    Promise.all(employees.map((e) => loadWeeks(e.id, weeksFrom, today, now))),
     createSupabaseAdmin()
       .from("time_entries")
       .select("id, user_id, work_date, start_at")
@@ -35,6 +38,9 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const defaultHoliday = holidays.filter((h) => h.date <= today).at(-1)?.date ?? holidays[0]?.date ?? today;
 
   const byId = new Map(employees.map((e) => [e.id, e]));
+  const overLimit = employees.flatMap((employee, i) =>
+    weeks[i].filter((w) => w.overLimit).map((week) => ({ employee, week })),
+  );
   const unclosed = ((unclosedRes.data ?? []) as Pick<TimeEntry, "id" | "user_id" | "work_date" | "start_at">[]).filter(
     (u) => byId.has(u.user_id),
   );
@@ -59,6 +65,26 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
                 <li key={u.id}>
                   <Link href={`/admin/djelatnici/${u.user_id}/${u.work_date}`} className="text-red-900 underline">
                     {fullName(byId.get(u.user_id)!)} · {formatDate(u.work_date)} · dolazak {zagrebTime(u.start_at)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {overLimit.length > 0 && (
+          <section className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <h2 className="mb-2 font-semibold text-amber-900">Više od {WEEKLY_LIMIT} h tjedno ({overLimit.length})</h2>
+            <p className="mb-3 text-sm text-amber-900">Provjeri zašto ovi djelatnici imaju više sati od dopuštenog (zadnja 4 tjedna).</p>
+            <ul className="flex flex-col gap-1 text-sm">
+              {overLimit.map(({ employee, week }) => (
+                <li key={`${employee.id}-${week.start}`}>
+                  <Link
+                    href={`/admin/statistika?${new URLSearchParams({ djelatnik: employee.id, od: week.start, do: week.end < today ? week.end : today })}`}
+                    className="text-amber-950 underline"
+                  >
+                    {fullName(employee)} · tjedan {formatDate(week.start)} – {formatDate(week.end)} ·{" "}
+                    <strong>{formatHours(week.hours)} h</strong>
                   </Link>
                 </li>
               ))}

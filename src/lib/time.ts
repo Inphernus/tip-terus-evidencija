@@ -97,3 +97,15 @@ export function isValidDate(value: string): boolean {
 export function isSunday(date: string): boolean {
   return new Date(`${date}T12:00:00Z`).getUTCDay() === 0;
 }
+
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Ponedjeljak tjedna u kojem je `date`. */
+export function mondayOf(date: string): string {
+  const day = new Date(`${date}T12:00:00Z`).getUTCDay();
+  return addDays(date, -((day + 6) % 7));
+}

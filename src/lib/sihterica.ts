@@ -1,11 +1,12 @@
 import ExcelJS from "exceljs";
-import type { Employee, PeriodSummary } from "@/lib/data";
-import { ABSENCE_HOURS, ABSENCE_LABEL, ABSENCE_TYPES } from "@/lib/hours";
+import type { Employee, PeriodSummary, WeekSummary } from "@/lib/data";
+import { ABSENCE_HOURS, ABSENCE_LABEL, ABSENCE_TYPES, WEEKLY_LIMIT } from "@/lib/hours";
 import { formatDate, weekdayShort, zagrebTime } from "@/lib/time";
 
-type Row = { employee: Employee; summary: PeriodSummary };
+type Row = { employee: Employee; summary: PeriodSummary; weeks: WeekSummary[] };
 
 const HOURS_FMT = "0.00";
+const WARN = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE8A3" } } as const;
 const GREY = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFEFEF" } } as const;
 const HEAD = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCE6F7" } } as const;
 const THIN = { style: "thin", color: { argb: "FFBFBFBF" } } as const;
@@ -44,7 +45,7 @@ function header(ws: ExcelJS.Worksheet, rowNo: number, labels: string[]) {
   row.height = 30;
 }
 
-function employeeSheet(wb: ExcelJS.Workbook, { employee, summary }: Row, from: string, to: string, used: Set<string>) {
+function employeeSheet(wb: ExcelJS.Workbook, { employee, summary, weeks }: Row, from: string, to: string, used: Set<string>) {
   const ws = wb.addWorksheet(sheetName(employee, used), {
     pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
     views: [{ state: "frozen", ySplit: 4 }],
@@ -66,9 +67,19 @@ function employeeSheet(wb: ExcelJS.Workbook, { employee, summary }: Row, from: s
     "Ukupno (h)", "Napomena",
   ]);
 
+  // Tjedan preko limita se označava na zadnjem danu tog tjedna unutar razdoblja.
+  const lastDate = summary.days.at(-1)?.date ?? to;
+  const weekWarning = new Map(
+    weeks
+      .filter((w) => w.overLimit)
+      .map((w) => [w.end < lastDate ? w.end : lastDate, `⚠ TJEDAN ${round2(w.hours).toFixed(2).replace(".", ",")} h – više od ${WEEKLY_LIMIT} h`]),
+  );
+
   let r = 5;
   for (const day of summary.days) {
+    const warning = weekWarning.get(day.date);
     const notes = [
+      warning,
       day.holiday,
       day.absence ? ABSENCE_LABEL[day.absence] : null,
       day.unclosed ? "NIJE ZATVOREN" : null,
@@ -89,6 +100,10 @@ function employeeSheet(wb: ExcelJS.Workbook, { employee, summary }: Row, from: s
       if (col >= hoursFrom && col <= hoursTo) cell.numFmt = HOURS_FMT;
       if (col === noteCol) cell.alignment = { wrapText: true, vertical: "top" };
       if (day.sunday || day.holiday) cell.fill = GREY;
+      if (warning && col === noteCol) {
+        cell.fill = WARN;
+        cell.font = { bold: true };
+      }
     });
   }
 
@@ -114,27 +129,35 @@ function summarySheet(wb: ExcelJS.Workbook, rows: Row[], from: string, to: strin
   });
   // Stupci: Djelatnik, Rad, [dana + sati za svaku vrstu odsutnosti], Ukupno
   const cols = 3 + ABSENCE_TYPES.length * 2;
+  const warnCol = cols + 1;
   const isHours = (col: number) => col === 2 || col === cols || (col > 2 && col < cols && (col - 3) % 2 === 1);
-  ws.columns = [{ width: 28 }, { width: 10 }, ...ABSENCE_TYPES.flatMap(() => [{ width: 13 }, { width: 13 }]), { width: 11 }];
-  title(ws, "Šihterica – zbirno", from, to, cols);
+  ws.columns = [{ width: 28 }, { width: 10 }, ...ABSENCE_TYPES.flatMap(() => [{ width: 13 }, { width: 13 }]), { width: 11 }, { width: 13 }];
+  title(ws, "Šihterica – zbirno", from, to, warnCol);
   header(ws, 4, [
     "Djelatnik", "Rad (h)",
     ...ABSENCE_TYPES.flatMap((t) => [`${ABSENCE_LABEL[t]} (dana)`, `${ABSENCE_LABEL[t]} (h)`]),
     "Ukupno (h)",
+    `Tjedana > ${WEEKLY_LIMIT} h`,
   ]);
 
   let r = 5;
-  for (const { employee, summary } of rows) {
+  for (const { employee, summary, weeks } of rows) {
+    const over = weeks.filter((w) => w.overLimit).length;
     const row = ws.getRow(r++);
     row.values = [
       name(employee) + (employee.active ? "" : " (neaktivan)"),
       round2(summary.workedHours),
       ...ABSENCE_TYPES.flatMap((t) => [summary.absenceDays[t], summary.absenceDays[t] * ABSENCE_HOURS]),
       round2(summary.totalHours),
+      over || null,
     ];
     row.eachCell({ includeEmpty: true }, (cell, col) => {
       cell.border = { bottom: THIN, left: THIN, right: THIN };
       if (isHours(col)) cell.numFmt = HOURS_FMT;
+      if (col === warnCol && over) {
+        cell.fill = WARN;
+        cell.font = { bold: true };
+      }
     });
   }
   const total = ws.getRow(r);

@@ -1,5 +1,8 @@
 export const ABSENCE_HOURS = 8;
 
+/** Najviše sati tjedno (pon–ned, rad + godišnji/bolovanje/blagdan); više od toga Jura provjerava. */
+export const WEEKLY_LIMIT = 40;
+
 export type TimeEntry = {
   id: number;
   user_id: string;

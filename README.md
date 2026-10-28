@@ -18,6 +18,7 @@ Web aplikacija za evidenciju dolazaka i odlazaka djelatnika.
 - Subota je radni dan; neradna je samo nedjelja (i blagdani).
 - Uređivanje dolaska/odlaska za bilo koji dan uz obavezan opis (opis je vidljiv i djelatniku).
 - Upozorenje za dane koje djelatnik nije zatvorio (nema odlaska) – Jura ih zatvara.
+- Najviše **40 h tjedno** (pon–ned, rad + godišnji/bolovanje/blagdan): tjedni preko limita su označeni na adminu, u statistici, tablici po danima i u šihterici, da ih Jura provjeri.
 - Statistika: filter po djelatniku i razdoblju.
 - Export šihterice (Excel) po djelatniku ili zbirno, s vikendima i blagdanima.
 - (QR kod radi Dario sam.)

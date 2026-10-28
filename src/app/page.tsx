@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AppHeader } from "@/components/app-header";
 import { PeriodTable } from "@/components/period-table";
 import { requireEmployee } from "@/lib/auth";
-import { loadPeriod } from "@/lib/data";
+import { loadPeriod, loadWeeks } from "@/lib/data";
 import { ABSENCE_LABEL, entryHours, formatHours } from "@/lib/hours";
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { formatDate, monthRange, MONTHS, parseMonth, shiftMonth, zagrebDate, zagrebTime } from "@/lib/time";
@@ -18,8 +18,9 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
   const month = parseMonth((await searchParams).mjesec, currentMonth);
   const [, monthEnd] = monthRange(month, today);
 
-  const [summary, unclosedRes] = await Promise.all([
+  const [summary, weeks, unclosedRes] = await Promise.all([
     loadPeriod(user.id, `${month}-01`, monthEnd, now),
+    loadWeeks(user.id, `${month}-01`, monthEnd, now),
     createSupabaseAdmin()
       .from("time_entries")
       .select("work_date")
@@ -84,7 +85,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
               )}
             </nav>
           </div>
-          <PeriodTable summary={summary} />
+          <PeriodTable summary={summary} weeks={weeks} />
         </section>
       </main>
     </>

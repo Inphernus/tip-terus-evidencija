@@ -1,5 +1,5 @@
 import "server-only";
-import { loadEmployee, loadEmployees, loadPeriod, type Employee, type PeriodSummary } from "@/lib/data";
+import { loadEmployee, loadEmployees, loadPeriod, loadWeeks, type Employee, type PeriodSummary, type WeekSummary } from "@/lib/data";
 import { dateRange, isValidDate, monthRange, zagrebDate } from "@/lib/time";
 
 export const MAX_DAYS = 366;
@@ -8,7 +8,7 @@ export type ReportParams = { userId: string | null; from: string; to: string };
 
 export type Report = {
   params: ReportParams;
-  rows: { employee: Employee; summary: PeriodSummary }[];
+  rows: { employee: Employee; summary: PeriodSummary; weeks: WeekSummary[] }[];
 };
 
 /** Čita filtere iz URL-a (?djelatnik=…&od=…&do=…); zadano je tekući mjesec za sve djelatnike. */
@@ -36,9 +36,12 @@ export async function loadReport(params: ReportParams): Promise<Report | null> {
     employees = await loadEmployees({ includeInactive: true });
   }
 
-  const summaries = await Promise.all(employees.map((e) => loadPeriod(e.id, params.from, params.to)));
+  const [summaries, weeks] = await Promise.all([
+    Promise.all(employees.map((e) => loadPeriod(e.id, params.from, params.to))),
+    Promise.all(employees.map((e) => loadWeeks(e.id, params.from, params.to))),
+  ]);
   const rows = employees
-    .map((employee, i) => ({ employee, summary: summaries[i] }))
+    .map((employee, i) => ({ employee, summary: summaries[i], weeks: weeks[i] }))
     // Neaktivni djelatnici ulaze u zbirni prikaz samo ako imaju sate u razdoblju.
     .filter((r) => params.userId || r.employee.active || r.summary.totalHours > 0);
   return { params, rows };

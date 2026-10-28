@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { PeriodTable } from "@/components/period-table";
 import { requireAdmin } from "@/lib/auth";
-import { fullName, loadEmployee, loadPeriod } from "@/lib/data";
+import { fullName, loadEmployee, loadPeriod, loadWeeks } from "@/lib/data";
 import { monthLabel, monthRange, parseMonth, shiftMonth, zagrebDate } from "@/lib/time";
 import { AbsenceRangeForm, ActiveToggle, PasswordResetForm } from "./employee-forms";
 
@@ -17,7 +17,7 @@ export default async function EmployeePage({ params, searchParams }: PageProps<"
   const currentMonth = today.slice(0, 7);
   const month = parseMonth((await searchParams).mjesec, currentMonth);
   const [from, to] = monthRange(month, today);
-  const summary = await loadPeriod(id, from, to);
+  const [summary, weeks] = await Promise.all([loadPeriod(id, from, to), loadWeeks(id, from, to)]);
   const base = `/admin/djelatnici/${id}`;
 
   return (
@@ -45,7 +45,7 @@ export default async function EmployeePage({ params, searchParams }: PageProps<"
               </nav>
             </div>
             <p className="mb-3 text-xs text-neutral-500">Klikni na dan za uređivanje sati, godišnjeg ili bolovanja.</p>
-            <PeriodTable summary={summary} editHref={(date) => `${base}/${date}`} />
+            <PeriodTable summary={summary} weeks={weeks} flagOverLimit editHref={(date) => `${base}/${date}`} />
           </section>
 
           <aside className="flex flex-col gap-5">
